@@ -1,11 +1,12 @@
-use windows::Win32::{
+use anyhow::bail;
+use windows::{core::w, Win32::{
   Globalization::{LCIDToLocaleName, LOCALE_ALLOW_NEUTRAL_NAMES},
   System::SystemServices::LOCALE_NAME_MAX_LENGTH,
   UI::{
     Input::KeyboardAndMouse::*, TextServices::HKL, WindowsAndMessaging::*,
   },
-};
-
+}};
+pub type WindowProcedure = WNDPROC;
 pub struct Language {}
 
 impl Language {
@@ -43,5 +44,41 @@ impl Language {
 
   fn loword(l: HKL) -> u32 {
     (l.0 as u32) & 0xffff
+  }
+
+  pub fn create_message_window(
+    window_procedure: WindowProcedure,
+  ) -> anyhow::Result<isize> {
+    let wnd_class = WNDCLASSW {
+      lpszClassName: w!("MessageWindow"),
+      style: CS_HREDRAW | CS_VREDRAW,
+      lpfnWndProc: window_procedure,
+      ..Default::default()
+    };
+
+    unsafe { RegisterClassW(&wnd_class) };
+
+    let handle = unsafe {
+      CreateWindowExW(
+        Default::default(),
+        w!("MessageWindow"),
+        w!("MessageWindow"),
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        None,
+        None,
+        wnd_class.hInstance,
+        None,
+      )
+    };
+
+    if handle.0 == 0 {
+      bail!("Creation of message window failed.");
+    }
+
+    Ok(handle.0)
   }
 }
